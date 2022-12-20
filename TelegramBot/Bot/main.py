@@ -44,11 +44,13 @@ async def checker_for_owner(ch: int, user_to_check: int):
 
 
 @dp.message_handler(commands="start")
-async def command_start(message: types.Message):
+async def start(message: types.Message):
     data[message.chat.id] = data.get(message.chat.id, dict())
+    data[message.chat.id][message.from_user.username] = message.from_user.id
     await bot.set_my_commands(
         [
             BotCommand('start', 'запустить бота'),
+            BotCommand('bot_info', 'Полезная информация про бота'),
             BotCommand('add_new_admin', 'Добавить администратора'),
             BotCommand('change_status', 'Поменять статус пользователя'),
             BotCommand('get_random_compliment', 'Получить рандомный комплимент'),
@@ -58,15 +60,27 @@ async def command_start(message: types.Message):
         ])
     await message.answer("Бот сделан Гиро Владимиром в рамках курса ИПР")
 
+
 @dp.message_handler(content_types=types.ContentType.NEW_CHAT_MEMBERS)
 async def some_handler(message: types.Message):
     data[message.chat.id] = data.get(message.chat.id, dict())
     data[message.chat.id][message.from_user.username] = message.from_user.id
 
 
+@dp.message_handler(commands="bot_info")
+async def bot_info(message: types.Message):
+    await message.answer("Бот создан для групповых чатов, некоторые функции не работают в личных сообщениях с ботом")
+    await message.answer("Для корректного взаимодействия бота с участниками чата, участник должен написать любое сообщение после запуска бота")
+    await message.answer("Функция change_status не пременима к владельцу и к самому боту")
+
+
 @dp.message_handler(commands="add_new_admin")
 async def add_new_admin(message: types.Message):
+    if message.from_user.id == message.chat.id:
+        await message.answer("Функция создана для группового чата")
+        return
     data[message.chat.id] = data.get(message.chat.id, dict())
+    data[message.chat.id][message.from_user.username] = message.from_user.id
     if await checker_for_admin(message.chat.id, message.from_user.id):
         await FSMCommands.admin.set()
         await message.answer("Укажите имя пользователя")
@@ -109,15 +123,18 @@ async def pull_admin(message: types.Message, state: FSMContext):
 @dp.message_handler(commands="ping_all")
 async def ping_all(message: types.Message):
     data[message.chat.id] = data.get(message.chat.id, dict())
-    if await checker_for_admin(message.chat.id, message.from_user.id):
-        cnt = 0
+    data[message.chat.id][message.from_user.username] = message.from_user.id
+    if message.from_user.id == message.chat.id:
         ping_names: str = ""
         for user_name in data[message.chat.id].keys():
-            if cnt % 5 == 4:
-                await message.answer(ping_names)
-                ping_names = ""
             ping_names += ('@' + user_name + ' ')
-            cnt += 1
+        if len(ping_names) != 0:
+            await message.answer(ping_names)
+        return
+    if await checker_for_admin(message.chat.id, message.from_user.id):
+        ping_names: str = ""
+        for user_name in data[message.chat.id].keys():
+            ping_names += ('@' + user_name + ' ')
         if len(ping_names) != 0:
             await message.answer(ping_names)
     else:
@@ -127,6 +144,10 @@ async def ping_all(message: types.Message):
 @dp.message_handler(commands="change_status")
 async def change_stat(message: types.Message):
     data[message.chat.id] = data.get(message.chat.id, dict())
+    data[message.chat.id][message.from_user.username] = message.from_user.id
+    if message.from_user.id == message.chat.id:
+        await message.answer("Функция создана для группового чата")
+        return
     if await checker_for_admin(message.chat.id, message.from_user.id):
         await FSMCommands.ch_st1.set()
         await message.answer("Укажите имя пользователя")
@@ -178,11 +199,15 @@ async def change_stat2(message: types.Message, state: FSMContext):
 
 @dp.message_handler(commands='get_random_compliment')
 async def compliment(message: types.Message):
+    data[message.chat.id] = data.get(message.chat.id, dict())
+    data[message.chat.id][message.from_user.username] = message.from_user.id
     await message.answer(choice(compliments))
 
 
 @dp.message_handler(commands='darts')
 async def darts(message: types.Message):
+    data[message.chat.id] = data.get(message.chat.id, dict())
+    data[message.chat.id][message.from_user.username] = message.from_user.id
     await bot.send_dice(chat_id=message.chat.id,
                         emoji="🎯",
                         protect_content=True)
@@ -191,16 +216,21 @@ async def darts(message: types.Message):
 
 @dp.message_handler(commands="delete_bot")
 async def leave_chat(message: types.Message):
+    if message.from_user.id == message.chat.id:
+        await message.answer("Функция создана для группового чата")
+        return
     if await checker_for_admin(message.chat.id, message.from_user.id):
         await message.answer("Бот удалён(")
         await bot.leave_chat(chat_id=message.chat.id)
     else:
         await message.answer("Вы не являетесь администратором")
 
+
 @dp.message_handler()
-async def collect_all_messages(message: types.Message):
+async def collect_any_message(message: types.Message):
     if message.from_user.id != bot.id:
         data[message.chat.id] = data.get(message.chat.id, dict())
         data[message.chat.id][message.from_user.username] = message.from_user.id
+
 
 executor.start_polling(dp, skip_updates=True)
