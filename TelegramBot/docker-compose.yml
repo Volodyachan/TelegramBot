@@ -1,0 +1,15 @@
+version: '3.7'
+
+services:
+  bot:
+    container_name: telegram_bote
+    build: ./Bot
+    volumes:
+      - ./Bot/logs/:/Bot/Bot/logs
+    environment:
+      - TOKEN
+
+  mysqldb:
+    container_name: bd
+    image: mysql
+
